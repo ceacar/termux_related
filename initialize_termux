@@ -1,0 +1,18 @@
+#!/bin/bash
+#private key saved in /data/data/com.termux/files/usr/etc/ssh/ssh_host_ed25519_key.
+#public key saved in /data/data/com.termux/files/usr/etc/ssh/ssh_host_ed25519_key.pub.
+echo 'installing essential packages'
+pkg install -y vim git openssh vim-python
+echo 'generating ssh keys'
+ssh-keygen
+#sshd opens port 8022.save private key in ~/.ssh/authroized use ssh ip -p 8022
+#sshd
+echo 'linking termux property files'
+ln -snf $PWD/colors.properties ~/.termux/colors.properties
+ln -snf $PWD/termux.properties ~/.termux/termux.properties
+echo 'reloading termux property'
+termux-reload-settings
+echo 'setting git email and username'
+git config --global user.name 'someone'
+git config --global user.email 'someone@somesite.com
+
