@@ -15,4 +15,4 @@ termux-reload-settings
 echo 'setting git email and username'
 git config --global user.name 'someone'
 git config --global user.email 'someone@somesite.com
-
+ls ./../ceacar_settings/ && ln -snf $PWD/../bashrc ~/.bashrc
