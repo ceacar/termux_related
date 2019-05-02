@@ -154,10 +154,29 @@ function digtunnel(){
 }
 
 function sourcepython(){
-    source ~/my_python_venv/bin/activate
+    source ~/.venv/my_python_venv/bin/activate
     export PYTHONPATH="$PYTHONPATH:/Users/ceacar/projects/sunfish:"
 }
 
 function sourcepython3(){
-    source ~/my_python_venv3/bin/activate
+    source ~/.venv/my_python_venv3/bin/activate
 }
+
+function download_mp3(){
+cd ~/repos/youtube_to_mp3
+./download_mp3.py $@
+cd -
+#mv ~/repos/youtube_to_mp3/*.mp3 /storage/3366-3031/Music/Downloads/
+mv ~/repos/youtube_to_mp3/*.mp3 /sdcard/Music/
+}
+
+function keep_my_phone_awake(){
+ping -i 0.3 localhost
+}
+
+function automate_ssh_agent(){
+  ls $HOME/.ssh_agent_socket >/dev/null 2>&1 || ssh-agent > $HOME/.ssh_agent_socket
+  source $HOME/.ssh_agent_socket
+  ssh-add
+}
+export -f automate_ssh_agent

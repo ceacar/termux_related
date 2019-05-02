@@ -1,0 +1,11 @@
+###connect termux via usb
+##install adb first
+#linux install adb
+sudo apt install adb
+#mac install adb
+brew install homebrew/cask/android-platform-tools
+#bind local port of 8022
+adb forward tcp:8022 tcp:8022
+#make sure termux has sshd running
+#now ssh to it
+ssh localhost -p 8022
