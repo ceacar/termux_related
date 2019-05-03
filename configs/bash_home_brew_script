@@ -1,0 +1,12 @@
+#!/bin/bash
+function download_mp3(){
+  cd $PROJECT_PATH/youtube_to_mp3
+  ./download_mp3.py $@
+  cd -
+  #mv ~/repos/youtube_to_mp3/*.mp3 /storage/3366-3031/Music/Downloads/
+  mv $PROJECT_PATH/youtube_to_mp3/*.mp3 /sdcard/Music/
+}
+
+function keep_my_phone_awake(){
+  ping -i 0.3 localhost
+}
