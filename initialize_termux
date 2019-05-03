@@ -1,20 +1,45 @@
 #!/bin/bash
 #private key saved in /data/data/com.termux/files/usr/etc/ssh/ssh_host_ed25519_key.
 #public key saved in /data/data/com.termux/files/usr/etc/ssh/ssh_host_ed25519_key.pub.
+
+
 echo 'installing essential packages'
 pkg install -y vim git openssh vim-python
 echo 'generating ssh keys'
 ssh-keygen
 #sshd opens port 8022.save private key in ~/.ssh/authroized use ssh ip -p 8022
 #sshd
+
+project_home="~/projects"
+echo 'clone ceacar_settings and termux_related repos from github'
+git clone https://github.com/ceacar/ceacar_settings.git $project_home/
+git clone https://github.com/ceacar/termux_related.git $project_home/
+git clone https://github.com/ceacar/youtube_to_mp3.git $project_home/
+git clone https://github.com/ceacar/utility.git $project_home/
+git clone https://github.com/ceacar/excalibur.git $project_home/
+git clone https://github.com/ceacar/misc.git $project_home/
+git clone https://github.com/ceacar/playground.git $project_home/
+
+termux_repo_loc=$project_home/termux_related
+termux_configs_path=$termux_repo_loc/configs
+termux_tools_path=$termux_repo_loc/tools
+ceacar_settings_configs_path=$project_home/ceacar_settings/configs
+termux_bin_path=/data/data/com.termux/files/usr/bin/
+
 echo 'linking termux property files'
-ln -snf $PWD/colors.properties ~/.termux/colors.properties
-ln -snf $PWD/termux.properties ~/.termux/termux.properties
+ln -snf $termux_configs_path/colors.properties ~/.termux/colors.properties
+ln -snf $termux_configs_path/termux.properties ~/.termux/termux.properties
 echo 'reloading termux property'
 termux-reload-settings
 echo 'setting git email and username'
-git config --global user.name 'someone'
-git config --global user.email 'someone@somesite.com
-ls ./../ceacar_settings/ && ln -snf $PWD/../ceacar_settings/bashrc ~/.bashrc
-ls ./../ceacar_settings/ && ln -snf $PWD/../ceacar_settings/bash_aliases ~/.bash_aliases
-ls ./../ceacar_settings/ && ln -snf $PWD/../ceacar_settings/bash_home_brew_script ~/.bash_home_brew_script
+$ceacar_settings_configs_path/git_alias
+$ceacar_settings_configs_path/git_username
+
+ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bashrc ~/.bashrc
+ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bash_aliases ~/.bash_aliases
+ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bash_home_brew_script ~/.bash_home_brew_script
+ln -snf $termux_configs_path/bash_home_brew_script $ceacar_settings_configs_path/local_configs/bash_local_config
+#set up gdrive
+ln -snf $termux_tools_path/gdrive $termux_bin_path/gdrive
+
+#need to check how to install python3
