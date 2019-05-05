@@ -38,6 +38,7 @@ $ceacar_settings_configs_path/git_username
 ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bashrc ~/.bashrc
 ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bash_aliases ~/.bash_aliases
 ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bash_home_brew_script ~/.bash_home_brew_script
+ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/bash_dir_path ~/.bash_dir_path
 ln -snf $termux_configs_path/bash_home_brew_script $ceacar_settings_configs_path/local_configs/bash_local_config
 #set up gdrive
 ln -snf $termux_tools_path/gdrive $termux_bin_path/gdrive
