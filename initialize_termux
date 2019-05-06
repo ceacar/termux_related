@@ -47,4 +47,8 @@ ln -snf $termux_tools_path/gdrive $termux_bin_path/gdrive
 mkdir -p ~/.vim/colors
 ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/corlos/xedit.vim ~/.vim/colors/xedit.vim
 
+#install all needed packages
+cat ./configs/requirements.txt | while read dependecy do; echo "installing $dependency";pkg install -y $dependecy >/dev/null;done
+
+
 #need to check how to install python3
