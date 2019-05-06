@@ -10,3 +10,9 @@ function download_mp3(){
 function keep_my_phone_awake(){
   ping -i 0.3 localhost
 }
+
+function backup_my_termux(){
+  cd ~
+  gpg -c . --passphrase @TE3vgyhpr
+  cd - 
+}

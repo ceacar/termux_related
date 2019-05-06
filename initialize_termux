@@ -43,4 +43,8 @@ ln -snf $termux_configs_path/bash_home_brew_script $ceacar_settings_configs_path
 #set up gdrive
 ln -snf $termux_tools_path/gdrive $termux_bin_path/gdrive
 
+#ships vim color scheme
+mkdir -p ~/.vim/colors
+ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/corlos/xedit.vim ~/.vim/colors/xedit.vim
+
 #need to check how to install python3
