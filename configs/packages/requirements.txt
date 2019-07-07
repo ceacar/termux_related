@@ -1,0 +1,19 @@
+crypt
+curl
+docker
+ffmpeg
+gnupg
+gpg
+java
+libgmp-dev
+libgnutls-dev
+libssh2-1-dev
+man
+mypy
+nettle-dev
+perl
+rsync
+transmission-cli
+zip
+procps proot vim-python openssh git golang python python-dev libclang cmake patch curl libcrypt-dev
+gzip
