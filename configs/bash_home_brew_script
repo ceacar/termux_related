@@ -13,6 +13,19 @@ function keep_my_phone_awake(){
 
 function backup_my_termux(){
   cd ~
-  gpg -c . --passphrase @TE3vgyhpr
+  gpg -c . --passphrase "1234"
   cd - 
 }
+
+function ssh_my_host(){
+  ssh xyu@$host_ip
+}
+
+alias cqlsh='sourcepython;cqlsh --cqlversion=3.4.4'
+export termux_settings="$PROJECT_PATH/termux_related"
+
+# check if need to update host
+if [ -f  ~/.config/misc/host_ip ]; then
+  update_host_info
+fi
+
