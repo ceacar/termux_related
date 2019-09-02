@@ -48,11 +48,13 @@ mkdir -p ~/.vim/colors
 ls $ceacar_settings_configs_path && ln -snf $ceacar_settings_configs_path/corlos/xedit.vim ~/.vim/colors/xedit.vim
 
 #install all needed packages
-cat ./configs/packages/requirements.txt | while read dependecy do; echo "installing $dependency";pkg install -y $dependecy >/dev/null;done
+cat ./configs/packages/requirements.txt | while read dependecy; do echo "installing $dependency";pkg install -y $dependecy >/dev/null;done
 
 # takes care of mount cmd not show up issue
 ln -snf /system/bin/mount $PREFIX/bin/mount
 
-#need to check how to install python3
+# need to check how to install python3
 
 mkdir -p ~/.config/misc
+# need this log path for some homebrew scritps
+mkdir -p ~/temp/log

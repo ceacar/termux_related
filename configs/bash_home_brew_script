@@ -21,6 +21,48 @@ function ssh_my_host(){
   ssh xyu@$host_ip
 }
 
+function run_on_host(){
+  __execute_cmd_on_host $host_ip $host_user $host_port $@
+}
+
+function ssh_to_host(){
+  ssh $host_user@$host_ip -p $host_port
+}
+
+function ship_directory(){
+  dir_to_sync=${1:?dir_to_sync empty}
+  target_dir=${2:?target_dir empty}
+  # make dirs for copy
+  run_on_host mkdir -p $target_dir
+  echo "Running: rsync --exclude '.git' --delete --exclude 'prepare-commit-msg' -azvq -L -e 'ssh -q -p $host_port' $dir_to_sync/ $host_user@$host_ip:\"$target_dir/\""
+  rsync --exclude '.git' --delete --exclude 'prepare-commit-msg' -azvq -L -e "ssh -q -p $host_port" $dir_to_sync/ $host_user@$host_ip:"$target_dir/"
+  echo "changing permission of remote $target_dir"
+  run_on_host chmod -R 777 $target_dir
+}
+
+function ship_current_directory(){
+  dir_to_sync=$PWD
+  target_dir="$(echo $dir_to_sync|sed 's/\/data\/data\/com.termux\/files\/home/~/g')"
+  ship_directory $dir_to_sync $target_dir
+}
+
+function hostify(){
+  dir_to_sync=$PWD
+  target_dir="$(echo $dir_to_sync|sed 's/\/data\/data\/com.termux\/files\/home/~/g')"
+  echo "==========================">&2
+  echo "Shipping current directory">&2
+  echo "==========================">&2
+  ship_current_directory
+  echo "==========================">&2
+  echo "|||||||||Shipped||||||||||">&2
+  echo "==========================">&2
+  echo ""
+  echo "===================================================================================================================================">&2
+  echo "Running cmd on $host_user@$host_ip -p $host_port $@">&2
+  echo "===================================================================================================================================">&2
+  run_on_host "cd $target_dir; $@;"
+}
+
 alias cqlsh='sourcepython;cqlsh --cqlversion=3.4.4'
 export termux_settings="$PROJECT_PATH/termux_related"
 
