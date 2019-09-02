@@ -29,3 +29,11 @@ if [ -f  ~/.config/misc/host_ip ]; then
   update_host_info
 fi
 
+# if ! $(ps aux |grep sshd);then
+#   echo "no sshd found"
+#   echo  "$(ps aux |grep sshd)"
+# else
+#   echo "found sshd"
+# fi
+
+export TEMP_PATH=~/temp

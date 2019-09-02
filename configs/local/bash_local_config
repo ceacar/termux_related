@@ -1,0 +1,503 @@
+#!/bin/bash
+PULSEPOINT_PATH_WITHOUT_PREFIX=projects/pulsepoint
+SHARED_DIR="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr $PULSEPOINT_PATH_WITHOUT_PREFIX/dm-www $PULSEPOINT_PATH_WITHOUT_PREFIX/reporting-api $PULSEPOINT_PATH_WITHOUT_PREFIX/dmreport $PULSEPOINT_PATH_WITHOUT_PREFIX/sql"
+DEFAULT_REMOTE_IP_FOR_UPLOADING="lga-grid256.contextweb.prod"
+DEFAULT_REMOTE_USER_FOR_UPLOADING="xiazi"
+#for docker settings 
+HOST_AGGR_PATH=$HOME/$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr
+MY_SOURCE_CODE_DIR=~/$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr:~/$PULSEPOINT_PATH_WITHOUT_PREFIX/dm-www:~/$PULSEPOINT_PATH_WITHOUT_PREFIX/dmreport:~/$PULSEPOINT_PATH_WITHOUT_PREFIX/reporting-api:$MY_SOURCE_CODE_DIR
+export P1_1="TE"
+export P2_1="PU"
+#host_ip is the laptop that cellphone connected to
+#export host_ip="192.168.86.25"
+export P1_2="@${P1_1}3vgyhpr"
+#host_user is the user name of the laptop account
+#export host_user="ceacar"
+export P2_2="@${P2_1}3vgyhpr"
+#remote_host is the host you want to copy files to
+export remote_host="lga256"
+export pp_notes=~/$PULSEPOINT_PATH_WITHOUT_PREFIX/pp_notes
+ssh_add_path=$TEMP_PATH/ssh_add_log.txt
+
+
+function _manual_add_my_identity(){
+  # this function is just used as a code keeper
+  ssh-add
+  ssh-add ~/projects/pulsepoint/pp_notes/configs/id_rsa
+}
+
+function add_my_identity(){
+  export DISPLAY=1
+  date >> $ssh_add_path
+  echo "$P1_2"| SSH_ASKPASS=$UTILITY_PATH/utility/ssh_add_helper ssh-add 2>> $ssh_add_path
+  echo "$P2_2"| SSH_ASKPASS=$UTILITY_PATH/utility/ssh_add_helper ssh-add ~/projects/pulsepoint/pp_notes/configs/id_rsa 2>> $ssh_add_path
+  unset DISPLAY
+  # check if last two ssh-add is successful or not
+  
+  if cat $ssh_add_path | tail -2 |grep "No such\|Error";then
+    return 1
+  else
+    return 0
+  fi
+  #return ! $return_code
+}
+
+function ___copy_to_lga_legacy(){
+  # this works but it copies everything before modifies the permission of dir
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  shipMyProjects
+  for path_temp in $SHARED_DIR;do
+    executeRemoteCmd $default_ip $default_user "sudo chmod -R 777 ~/$path_temp"
+  done
+}
+
+function copy_to_lga(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  for path_temp in $SHARED_DIR;do
+    echo "copy ~/$path_temp to $remote_host"
+    rsync --exclude '.git' --delete --exclude 'prepare-commit-msg' -azvq -L -e 'ssh -q' ~/$path_temp/ $remote_host:~/$path_temp/
+    echo "changing permission of remote '~/'$path_temp"
+    run_cmd_on_lga256 "sudo chmod -R 777 ~/$path_temp"
+  done
+}
+
+
+export LGA_ENV_PATH=/home/xiazi/anaconda/bin:/home/xiazi/anaconda/condabin:/usr/lib64/qt-3.3/bin:/usr/local/maven/bin:/usr/local/bin:/usr/bin:/opt/puppetlabs/bin:/opt/dell/srvadmin/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/X11R6/bin:/usr/java/default/bin:/home/xiazi/Documents/code:/usr/local/go/bin:/usr/local/go/bin:/home/xiazi/projects/utility/bash_lib:/opt/share/jvm/current_java_jdk/bin:/home/xiazi/anaconda/bin:/home/xiazi/.local/bin:/home/xiazi/bin;
+
+function run_cmd_on_lga256(){
+  local cmd="ssh -q -o ConnectTimeout=5 lga256 \"source /home/xiazi/.bashrc;export PATH=$LGA_ENV_PATH;$@\""
+  echo "runing cmd -> $cmd"
+  eval $cmd 2>&1 | tee ~/temp/last_run_cmd_on_lga256_result.txt
+  #example final string built aggr cmd
+  #ssh -o ConnectTimeout=2 lga256 "\"export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga $@ 2>&1 | tee /tmp/aggr_dry_run.log \""
+}
+
+function run_aggr_cmd(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  copy_to_lga
+  #run cmd remotely
+  #executeRemoteCmd $default_ip, $default_user 
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh; $@ 2>&1 | tee /tmp/aggr_cmd.log"
+  run_cmd_on_lga256 $cmd
+}
+
+
+function docker_run_dev(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  copy_to_lga
+  #run cmd remotely
+  clear_luigi_pids_in_dev_docker_images_via_host
+  echo "issued task for clearing luigi pid in docker image $!"
+
+  #executeRemoteCmd $default_ip, $default_user 
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga $@ 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256 $cmd
+}
+
+function docker_run_normal(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  copy_to_lga
+  #run cmd remotely
+  #executeRemoteCmd $default_ip, $default_user 
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh &&docker_build&& docker_run lga $@ 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256 $cmd
+}
+
+export -f add_my_identity
+
+export aggr="$HOST_AGGR_PATH"
+export dm_www="$HOME/$PULSEPOINT_PATH_WITHOUT_PREFIX/dm-www"
+
+function copy_docker_dev_to_aggr(){
+  cp -r ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/dev $HOST_AGGR_PATH/docker/dev
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/pom.xml $HOST_AGGR_PATH/pom.xml
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/docker_run_tools.sh $HOST_AGGR_PATH/
+}
+
+
+function kill_all_luigi_task_on_lga_256(){
+  run_cmd_on_lga256 "kill_all_luigi" 
+}
+
+
+function redis_ams_01(){
+  local ams01="10.220.12.130"
+  local ams01_port="7000"
+  redis-cli -c -h $ams01 -p $ams01_port
+}
+
+
+function run_cmd_on_lga256_via_local_host(){
+  local cmd="ssh -A -tt $host_user@$host_ip ssh -tt -q -o ConnectTimeout=5 lga256 '\"source /home/xiazi/.bashrc;export PATH=$LGA_ENV_PATH;$@\"'"
+  echo "running cmd -> $cmd"
+  eval $cmd 2>&1 | tee ~/temp/log/last_run_cmd_on_lga256_result.txt
+}
+
+function view_last_run_cmd_on_lga256_result(){
+  local path=~/temp/log/last_run_cmd_on_lga256_result.txt
+  echo "less $path"
+  less $path
+}
+
+function view_hql_last_run_cmd_on_lga256_result(){
+  local path=~/temp/log/last_run_cmd_on_lga256_result.txt
+  echo "less $path"
+  cat $path | grep -v "^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed."|less
+}
+
+
+function copy_to_lga_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  for path_temp in $SHARED_DIR;do
+    echo "copy ~/$path_temp to $remote_host"
+    rsync --exclude '.git' --delete --exclude 'prepare-commit-msg' -azvq -L -e 'ssh -q -A -J $host_user@$host_ip' ~/$path_temp/ $remote_host:~/$path_temp/
+    echo "changing permission of remote '~/'$path_temp"
+    run_cmd_on_lga256_via_local_host "sudo chmod -R 777 ~/$path_temp"
+  done
+}
+
+
+function copy_from_lga_via_host(){
+  local remote_abs_path=${1:?remote_abs_path empty}
+  scp -oProxyJump=$host_user@$host_ip lga256:$remote_abs_path ./
+}
+
+
+
+function _sync_remote_repo_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/${1:?remote repo name not set}"
+  #copy aggr file and change permission
+  echo "copy ~/$path_temp to $remote_host"
+  echo "rsync --delete --exclude '.git' -azvq -L -e 'ssh -q -A -J $host_user@$host_ip' ~/$path_temp/ $remote_host:~/$path_temp/"
+  rsync --delete --exclude '.git' -azvq -L -e 'ssh -q -A -J $host_user@$host_ip' ~/$path_temp/ $remote_host:~/$path_temp/
+  echo "changing permission of remote '~/'$path_temp"
+  run_cmd_on_lga256_via_local_host "sudo chmod -R 777 ~/$path_temp"
+}
+
+function _sync_remote_repo(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/${1:?remote repo name not set}"
+  #copy aggr file and change permission
+  echo "copy ~/$path_temp to $remote_host"
+  echo "rsync --delete --exclude '.git' -azvq -L ~/$path_temp/ $remote_host:~/$path_temp/"
+  rsync --delete --exclude '.git' -azvq -L ~/$path_temp/ $remote_host:~/$path_temp/
+  echo "changing permission of remote '~/'$path_temp"
+  run_cmd_on_lga256 "sudo chmod -R 777 ~/$path_temp"
+}
+
+function _sync_remote_aggr_repo(){
+  _sync_remote_repo 'aggr'
+}
+
+function _sync_remote_sql_repo(){
+  _sync_remote_repo 'sql'
+}
+
+function _sync_remote_aggr_repo_via_host(){
+  _sync_remote_repo_via_host 'aggr'
+}
+
+function _sync_remote_sql_repo_via_host(){
+  _sync_remote_repo_via_host 'sql'
+}
+
+
+function docker_run_dev_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+
+  clear_luigi_pids_in_dev_docker_images_via_host
+  echo "issued task for clearing luigi pid in docker image $!"
+
+  _sync_remote_aggr_repo_via_host
+  echo "issued rsync tasks $!"
+
+  #run cmd remotely
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga $@ 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+
+}
+
+
+function clear_luigi_pids_in_dev_docker_images_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+
+  #run cmd remotely
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga rm /tmp/luigi/* 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+function clear_luigi_pids_in_dev_docker_images(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+
+  #run cmd remotely
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga rm /tmp/luigi/* 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+
+
+
+
+function docker_run_normal_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+
+  _sync_remote_aggr_repo_via_host
+
+  #run cmd remotely
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run lga $@ 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+
+function docker_build_dev_via_host(){
+  _sync_remote_aggr_repo_via_host
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_build_dev 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+
+function docker_build_dev(){
+  _sync_remote_aggr_repo
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_build_dev 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256 $cmd
+}
+
+function docker_build_normal_via_host(){
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_build 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+
+function kill_all_luigi_task_on_lga_256_via_host(){
+  run_cmd_on_lga256_via_local_host "kill_all_luigi" 
+}
+
+function devify_my_aggr_repo(){
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/docker_run_tools.sh $aggr/
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/pom.xml $aggr/
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/__init__.py $aggr/aggr/
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/debugger.py $aggr/aggr/
+  mkdir -p $aggr/docker/dev
+  cp ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/bak/dev/Dockerfile $aggr/docker/dev/Dockerfile
+  ln -snf $ceacar_setting/../termux_related/configs/local/prepare-commit-msg $aggr/.git/hooks/prepare-commit-msg
+}
+
+function retrieve_avro_schema(){
+  #curl http://lga-avro.pulse.prod/avro-schema-repo/RecordingPixelLogEvent/latest
+  curl http://lga-avro.pulse.prod/avro-schema-repo/${1:?class name not set}/${2:?schema_id not set} \
+    | sed 's/},/},\n/g' \
+    | tee $TEMP_PATH/temp_$FUNCNAME.txt
+}
+
+function run_aggr_cmd_via_host(){
+  # Mac has a sharing setting and inside it, it has a remote login option which need to be turned on and at the same time the allowed user should be added accordingly for ssh server to work properly
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+
+  _sync_remote_aggr_repo_via_host
+
+  #run cmd remotely
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && $@ 2>&1 | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+function aggr_test_dev(){
+  run_aggr_cmd_via_host docker_run_dev lga nosetests aggr.tests
+}
+
+function aggr_test(){
+
+  run_aggr_cmd_via_host rm '/home/xiazi/projects/pulsepoint/aggr/.git/hooks/prepare-commit-msg'
+  run_aggr_cmd_via_host docker_build
+  run_aggr_cmd_via_host docker_run lga nosetests aggr.tests
+}
+
+# this function doesn't do hive -e query right because of quotes issues
+# function hql_run_cmd_via_host(){
+#   local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+#   local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+#   local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+# 
+#   _sync_remote_aggr_repo_via_host
+# 
+#   #run cmd remotely
+#   local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga hive -e '$@' 2>&1 | tee /tmp/aggr_dry_run.log"
+#   run_cmd_on_lga256_via_local_host $cmd
+# }
+
+function __hql_run_file_via_host(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+  local file_name_input=${1:?file_name empty, it has to be a file in sql}
+  local file_name="$(basename $file_name_input)"
+
+
+  _sync_remote_sql_repo_via_host
+
+  #run cmd remotely
+  echo "=====================================Running====================================="
+  grep -v '\-\-\|^$' $file_name_input
+  echo "================================================================================="
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga hive --hiveconf hive.root.logger=OFF -S -f /sql/$file_name 2>/dev/null | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256_via_local_host $cmd
+}
+
+function hql_run_file_via_host(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_via_host_2(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp2.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_via_host_3(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp3.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_via_host_4(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp4.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_via_host_5(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp5.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_via_host_6(){
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/temp6.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+
+function hql_run_file(){
+  __hql_run_file ~/projects/pulsepoint/sql/temp.hql | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_specify_file(){
+  local file_to_run=${1:?file_to_run need to be set}
+  __hql_run_file ~/projects/pulsepoint/sql/${file_to_run} | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+}
+
+function hql_run_file_specify_file_via_host(){
+  local file_to_run=${1:?file_to_run need to be set}
+  __hql_run_file_via_host ~/projects/pulsepoint/sql/${file_to_run} | grep -v "^Warning\|^WARN: \|Java HotSpot(TM) 64-Bit Server VM warning:\|^SLF4J:\|parquet.hadoop.\|Connection to .*closed.\|Warning: Permanently added " | tee $TEMP_PATH/log/last_hql_run_result.txt
+
+}
+
+function __hql_run_file(){
+  local default_ip=${DEFAULT_REMOTE_IP_FOR_UPLOADING:?DEFAULT_REMOTE_IP_FOR_UPLOADING is not set in $FUNCNAME}
+  local default_user=${DEFAULT_REMOTE_USER_FOR_UPLOADING:?DEFAULT_REMOTE_USER_FOR_UPLOADING is not set in $FUNCNAME}
+  local path_temp="$PULSEPOINT_PATH_WITHOUT_PREFIX/aggr"
+  local file_name_input=${1:?file_name empty, it has to be a file in sql}
+  local file_name="$(basename $file_name_input)"
+
+  _sync_remote_sql_repo
+
+  #run cmd remotely
+  echo "=====================================Running====================================="
+  grep -v '\-\-\|^$' $file_name_input
+  echo "================================================================================="
+  local cmd="export HOST_AGGR_PATH=/home/xiazi/projects/pulsepoint/aggr&&cd /home/xiazi/projects/pulsepoint/aggr&&source docker_run_tools.sh && docker_run_dev lga hive --hiveconf hive.root.logger=OFF -S -f /sql/$file_name 2>/dev/null | tee /tmp/aggr_dry_run.log"
+  run_cmd_on_lga256 $cmd
+}
+
+
+function hql_scratch_run_via_host(){
+  hql_run_file_via_host ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/sql/scratch.hql
+}
+
+alias hql_scratch='vim ~/$PULSEPOINT_PATH_WITHOUT_PREFIX/sql/scratch.hql'
+
+function ssh_to_lga256_via_local_host(){
+  ssh -A -t $host_user@$host_ip ssh lga256 
+}
+
+function ssh_via_local_host(){
+  ssh -A -t $host_user@$host_ip ssh $@
+}
+
+function reload_credentials(){
+  # source the agent pid from file
+  source_ssh_agent
+
+  # try ssh-add, if failed, regenerate and ssh agent
+  if ! add_my_identity;then
+    echo "no ssh agent running, generating one"
+    regen_ssh_agent
+    add_my_identity
+  fi
+
+  echo "added identity"
+}
+
+function backup_termux_local_configs(){
+  cd $termux_settings/configs/local/
+  for file in $(ls $PWD|grep -v ".gpg");do
+    gpg -c --batch --yes --passphrase "$P1_2" ./$file
+  done
+  cd - 
+}
+
+export -f backup_termux_local_configs
+
+function restore_termux_local_configs(){
+  cd $termux_settings/configs/local/
+  for file in $(ls $PWD|grep ".gpg");do
+    gpg -d --batch --yes --passphrase "$P1_2" --output ./$(echo $file|rev|cut -d '.' -f 2-|rev) ./$file
+  done
+  cd - 
+}
+
+function my_host_ip(){
+  cat ~/.config/misc/*
+}
+
+function digtunnel_cassandra(){
+  local chost=${1:-10.201.14.121}
+  echo "use \"cqlsh localhost\" to connect to cassandra"
+  ssh -L 9042:10.201.14.121:9042 $host_user@$host_ip
+}
+
+function set_ip_home_pc(){
+  export host_ip=192.168.86.175
+  export host_user=ceacar
+  export host_port=45569
+}
+
+
+# automatically reload credentials upon new terminal
+reload_credentials
+
+# auto start cron server
+# ps aux |grep cron >/dev/null 2>&1|| crond
+
+
+
+
+
+
+
+
+# impala environment
+# host:lga-impala-secure.pulse.prod
+# port:21050
+# auth_mechanism:PLAIN
+# user:aggr
+# password:Pulse1ag
